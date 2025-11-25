@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Admin Panel</title>
+<script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="p-6 bg-gray-100 min-h-screen">
+<div class="max-w-5xl mx-auto space-y-6">
+
+  <header class="flex items-center justify-between">
+    <h1 class="text-2xl font-bold">Admin Panel</h1>
+    <div>
+      <button id="createAdmin" class="bg-red-500 text-white px-3 py-1 rounded">Ensure Admin Exists</button>
+      <button id="logoutBtn" class="ml-2 bg-gray-200 px-3 py-1 rounded">Logout Admin</button>
+      <a class="ml-2 text-blue-600" href="index.html">Open App</a>
+    </div>
+  </header>
+
+  <!-- QR MANAGEMENT -->
+  <section class="bg-white p-4 rounded shadow">
+    <h2 class="font-semibold mb-3">Recharge QR Management</h2>
+    <p class="text-sm text-gray-600 mb-3">Upload an image for each fixed amount. Max 2MB each.</p>
+    <div id="qrList" class="grid grid-cols-1 gap-3"></div>
+  </section>
+
+  <!-- PENDING DEPOSITS -->
+  <section class="bg-white p-4 rounded shadow">
+    <h2 class="font-semibold mb-3">Pending Deposits</h2>
+    <div id="depositsList" class="space-y-3"></div>
+  </section>
+
+  <!-- PENDING WITHDRAWALS -->
+  <section class="bg-white p-4 rounded shadow">
+    <h2 class="font-semibold mb-3">Pending Withdrawals</h2>
+    <div id="withdrawalsList" class="space-y-3"></div>
+  </section>
+
+  <!-- TRANSACTIONS -->
+  <section class="bg-white p-4 rounded shadow">
+    <h2 class="font-semibold mb-3">Transactions</h2>
+    <div id="transactionsList" class="space-y-2 text-sm"></div>
+    <p class="text-xs text-gray-500 mt-2">All deposits, withdraws and admin adjustments appear here.</p>
+  </section>
+
+  <!-- NOTIFICATIONS -->
+  <section class="bg-white p-4 rounded shadow">
+    <h2 class="font-semibold mb-3">Send Notification</h2>
+    <input id="notifTitle" placeholder="Title" class="w-full border p-2 rounded mb-2"/>
+    <textarea id="notifMsg" placeholder="Message" class="w-full border p-2 rounded mb-2"></textarea>
+    <div class="flex gap-2">
+      <button id="sendNotif" class="bg-indigo-600 text-white px-3 py-2 rounded">Send to All</button>
+      <button id="sendNotifUser" class="bg-gray-200 px-3 py-2 rounded">Send to Selected User</button>
+    </div>
+    <p class="text-xs text-gray-500 mt-2">Notifications appear for users in Index (notifications area).</p>
+  </section>
+
+  <!-- USERS (existing UI preserved) -->
+  <section class="bg-white p-4 rounded shadow">
+    <h2 class="font-semibold mb-3">Users</h2>
+    <div id="userList" class="space-y-3"></div>
+  </section>
+
+</div>
+
+<script>
+// ---------------------------- Utilities ----------------------------
+const FIX_AMOUNTS = [350,500,1000,1500,2000,5000];
+
+function getUsers(){ return JSON.parse(localStorage.getItem('users')||'[]'); }
+function saveUsers(u){ localStorage.setItem('users', JSON.stringify(u)); }
+function getQRs(){ return JSON.parse(localStorage.getItem('qrCodes')||'{}'); }
+function saveQRs(q){ localStorage.setItem('qrCodes', JSON.stringify(q)); }
+function getDeposits(){ return JSON.parse(localStorage.getItem('deposits')||'[]'); }
+function saveDeposits(d){ localStorage.setItem('deposits', JSON.stringify(d)); }
+function getWithdraws(){ return JSON.parse(localStorage.getItem('withdrawals')||'[]'); }
+function saveWithdraws(w){ localStorage.setItem('withdrawals', JSON.stringify(w)); }
+function getTransactions(){ return JSON.parse(localStorage.getItem('transactions')||'[]'); }
+function saveTransactions(t){ localStorage.setItem('transactions', JSON.stringify(t)); }
+function getNotifications(){ return JSON.parse(localStorage.getItem('notifications')||'[]'); }
+function saveNotifications(n){ localStorage.setItem('notifications', JSON.stringify(n)); }
+
+function createTransaction(obj){
+  const tx = getTransactions();
+  tx.unshift(Object.assign({id: 'tx_' + Date.now(), at: new Date().toISOString()}, obj));
+  saveTransactions(tx);
+}
+
+// ---------------------------- Admin ensure ----------------------------
+document.getElementById('createAdmin').onclick = ()=>{
+  let users = getUsers();
+  if(!users.find(u=>u.phone==='admin')){
+    users.push({
+      phone:'admin', password:'admin123', name:'Administrator',
+      balance:0, totalIncome:0, vip:'ADMIN', blocked:false,
+      subscriptions:[], createdAt:new Date().toISOString()
+    });
+    saveUsers(users);
+    alert('Admin created (admin / admin123)');
+    renderUsers();
+  } else alert('Admin exists');
+};
+document.getElementById('logoutBtn').onclick = ()=>{ localStorage.removeItem('currentUser'); alert('Logged out'); };
+
+// ---------------------------- QR Management ----------------------------
+if(!localStorage.getItem("qrCodes")){
+  const init = {};
+  FIX_AMOUNTS.forEach(a => init[a] = "https://via.placeholder.com/300x300?text=QR+"+a);
+  saveQRs(init);
+}
+
+function renderQRList(){
+  const qrArea = document.getElementById('qrList');
+  const qrs = getQRs();
+  qrArea.innerHTML = '';
+  FIX_AMOUNTS.forEach(amount => {
+    const box = document.createElement('div');
+    box.className = 'flex items-center justify-between p-3 border rounded';
+    box.innerHTML = `
+      <div class="flex items-center gap-4">
+        <div>
+          <div class="font-semibold">₹${amount}</div>
+          <img id="preview_${amount}" src="${qrs[amount]||''}" class="w-28 h-28 border rounded mt-2 object-contain"/>
+        </div>
+      </div>
+      <div class="flex flex-col items-end gap-2">
+        <input class="fileInput" data-amt="${amount}" type="file" accept="image/*"/>
+        <div class="flex gap-2">
+          <button class="updateBtn bg-blue-600 text-white px-3 py-1 rounded" data-amt="${amount}">Upload & Save</button>
+          <button class="removeBtn bg-gray-200 px-3 py-1 rounded" data-amt="${amount}">Remove</button>
+        </div>
+      </div>
+    `;
+    qrArea.appendChild(box);
+  });
+
+  // handlers
+  document.querySelectorAll('.updateBtn').forEach(btn=>{
+    btn.onclick = ()=>{
+      const amount = btn.dataset.amt;
+      const fileInput = document.querySelector(`input.fileInput[data-amt="${amount}"]`);
+      if(!fileInput || !fileInput.files.length){ alert('Select image first'); return; }
+      const file = fileInput.files[0];
+      if(file.size > 2 * 1024*1024){ alert('File too big (max 2MB)'); return; }
+      const reader = new FileReader();
+      reader.onload = ()=> {
+        const base64 = reader.result;
+        const qrs = getQRs(); qrs[amount] = base64; saveQRs(qrs);
+        document.getElementById('preview_'+amount).src = base64;
+        alert('QR updated for ₹' + amount);
+      };
+      reader.onerror = ()=> alert('Error reading file');
+      reader.readAsDataURL(file);
+    };
+  });
+
+  document.querySelectorAll('.removeBtn').forEach(btn=>{
+    btn.onclick = ()=>{
+      const amount = btn.dataset.amt;
+      if(!confirm('Remove QR for ₹' + amount + '?')) return;
+      const qrs = getQRs(); qrs[amount] = ''; saveQRs(qrs);
+      renderQRList();
+    };
+  });
+}
+renderQRList();
+
+// ---------------------------- Deposits (pending) ----------------------------
+function renderDeposits(){
+  const area = document.getElementById('depositsList');
+  const deposits = getDeposits().slice().reverse();
+  area.innerHTML = deposits.length ? '' : '<div class="text-sm text-gray-500">No pending deposits</div>';
+  deposits.forEach(d=>{
+    if(d.status !== 'pending') return;
+    const el = document.createElement('div');
+    el.className = 'p-3 border rounded flex justify-between items-center';
+    el.innerHTML = `
+      <div>
+        <div class="font-semibold">${d.userPhone} — ₹${d.amount}</div>
+        <div class="text-xs text-gray-500">At: ${new Date(d.at).toLocaleString()}</div>
+      </div>
+      <div class="flex gap-2">
+        <button class="approveBtn bg-green-500 text-white px-3 py-1 rounded" data-id="${d.id}">Approve</button>
+        <button class="declineBtn bg-red-500 text-white px-3 py-1 rounded" data-id="${d.id}">Decline</button>
+      </div>
+    `;
+    area.appendChild(el);
+  });
+
+  document.querySelectorAll('.approveBtn').forEach(b=>{
+    b.onclick = ()=>{
+      const id = b.dataset.id;
+      let deposits = getDeposits();
+      const idx = deposits.findIndex(x=>x.id===id);
+      if(idx<0) return alert('Not found');
+      const d = deposits[idx];
+      // credit user
+      let users = getUsers();
+      const uidx = users.findIndex(x=>x.phone===d.userPhone);
+      if(uidx<0){ alert('User not found'); return; }
+      users[uidx].balance = (users[uidx].balance||0) + d.amount;
+      users[uidx].recharges = users[uidx].recharges||[];
+      users[uidx].recharges.push({amount:d.amount, at: new Date().toISOString(), method:'QR Verified'});
+      saveUsers(users);
+
+      deposits[idx].status = 'approved';
+      deposits[idx].processedAt = new Date().toISOString();
+      saveDeposits(deposits);
+
+      // transaction
+      createTransaction({type:'deposit', user: d.userPhone, amount: d.amount, note:'QR verified by admin'});
+      // notify
+      const not = getNotifications(); not.unshift({id:'n_'+Date.now(), to: d.userPhone, title:'Deposit Approved', msg:`₹${d.amount} added to your balance.`, at: new Date().toISOString(), read:false}); saveNotifications(not);
+
+      alert('Deposit approved and balance updated.');
+      renderDeposits(); renderTransactions(); renderUsers();
+    };
+  });
+
+  document.querySelectorAll('.declineBtn').forEach(b=>{
+    b.onclick = ()=>{
+      const id = b.dataset.id;
+      let deposits = getDeposits();
+      const idx = deposits.findIndex(x=>x.id===id);
+      if(idx<0) return;
+      deposits[idx].status = 'declined';
+      deposits[idx].processedAt = new Date().toISOString();
+      saveDeposits(deposits);
+      // notify
+      const d = deposits[idx];
+      const not = getNotifications(); not.unshift({id:'n_'+Date.now(), to: d.userPhone, title:'Deposit Declined', msg:`Your deposit of ₹${d.amount} was declined.`, at:new Date().toISOString(), read:false}); saveNotifications(not);
+
+      alert('Deposit declined.');
+      renderDeposits(); renderTransactions();
+    };
+  });
+}
+renderDeposits();
+
+// ---------------------------- Withdrawals (pending) ----------------------------
+function renderWithdraws(){
+  const area = document.getElementById('withdrawalsList');
+  const items = getWithdraws().slice().reverse();
+  area.innerHTML = items.length ? '' : '<div class="text-sm text-gray-500">No pending withdrawals</div>';
+  items.forEach(w=>{
+    if(w.status !== 'requested') return;
+    const el = document.createElement('div');
+    el.className = 'p-3 border rounded flex justify-between items-center';
+    el.innerHTML = `
+      <div>
+        <div class="font-semibold">${w.userPhone} — ₹${w.amount}</div>
+        <div class="text-xs text-gray-500">To: ${w.to} | At: ${new Date(w.at).toLocaleString()}</div>
+      </div>
+      <div class="flex gap-2">
+        <button class="payBtn bg-green-500 text-white px-3 py-1 rounded" data-id="${w.id}">Mark Paid</button>
+        <button class="cancelBtn bg-red-500 text-white px-3 py-1 rounded" data-id="${w.id}">Decline</button>
+      </div>
+    `;
+    area.appendChild(el);
+  });
+
+  document.querySelectorAll('.payBtn').forEach(b=>{
+    b.onclick = ()=>{
+      const id = b.dataset.id;
+      let withdraws = getWithdraws();
+      const idx = withdraws.findIndex(x=>x.id===id);
+      if(idx<0) return;
+      const w = withdraws[idx];
+      // Deduct already done? For safety ensure balance >= amount
+      let users = getUsers();
+      const uidx = users.findIndex(x=>x.phone===w.userPhone);
+      if(uidx<0) return alert('User not found');
+      if((users[uidx].balance||0) < w.amount) return alert('Insufficient balance for user');
+      users[uidx].balance -= w.amount;
+      saveUsers(users);
+
+      withdraws[idx].status = 'paid';
+      withdraws[idx].processedAt = new Date().toISOString();
+      saveWithdraws(withdraws);
+
+      createTransaction({type:'withdraw', user: w.userPhone, amount: w.amount, note:'Withdraw paid by admin'});
+      // notify
+      const not = getNotifications(); not.unshift({id:'n_'+Date.now(), to: w.userPhone, title:'Withdrawal Paid', msg:`Your withdrawal of ₹${w.amount} is marked paid.`, at:new Date().toISOString(), read:false}); saveNotifications(not);
+
+      alert('Withdraw marked paid and user balance updated.');
+      renderWithdraws(); renderTransactions(); renderUsers();
+    };
+  });
+
+  document.querySelectorAll('.cancelBtn').forEach(b=>{
+    b.onclick = ()=>{
+      const id = b.dataset.id;
+      let withdraws = getWithdraws();
+      const idx = withdraws.findIndex(x=>x.id===id);
+      if(idx<0) return;
+      withdraws[idx].status = 'declined';
+      withdraws[idx].processedAt = new Date().toISOString();
+      saveWithdraws(withdraws);
+      // notify
+      const w = withdraws[idx];
+      const not = getNotifications(); not.unshift({id:'n_'+Date.now(), to: w.userPhone, title:'Withdrawal Declined', msg:`Your withdrawal of ₹${w.amount} was declined.`, at:new Date().toISOString(), read:false}); saveNotifications(not);
+
+      alert('Withdrawal declined.');
+      renderWithdraws(); renderTransactions();
+    };
+  });
+}
+renderWithdraws();
+
+// ---------------------------- Transactions ----------------------------
+function renderTransactions(){
+  const area = document.getElementById('transactionsList');
+  const txs = getTransactions();
+  area.innerHTML = txs.length ? '' : '<div class="text-sm text-gray-500">No transactions yet</div>';
+  txs.slice(0,200).forEach(t=>{
+    const el = document.createElement('div');
+    el.className = 'p-2 border rounded flex justify-between items-center';
+    el.innerHTML = `<div class="text-xs"><div class="font-semibold">${t.type.toUpperCase()} — ₹${t.amount||''} ${t.user? ' | ' + t.user : ''}</div>
+                    <div class="text-gray-600">${t.note||''}</div>
+                    <div class="text-gray-400 text-xs">${new Date(t.at).toLocaleString()}</div></div>`;
+    area.appendChild(el);
+  });
+}
+renderTransactions();
+
+// ---------------------------- Notifications ----------------------------
+document.getElementById('sendNotif').onclick = ()=>{
+  const title = document.getElementById('notifTitle').value.trim();
+  const msg = document.getElementById('notifMsg').value.trim();
+  if(!title || !msg) return alert('Enter title and message');
+  const notifications = getNotifications();
+  notifications.unshift({id:'n_'+Date.now(), to: 'all', title, msg, at: new Date().toISOString(), read:false});
+  saveNotifications(notifications);
+  alert('Notification sent to all users');
+};
+
+document.getElementById('sendNotifUser').onclick = ()=>{
+  const phone = prompt('Enter user phone to send notification to:');
+  if(!phone) return;
+  const title = document.getElementById('notifTitle').value.trim();
+  const msg = document.getElementById('notifMsg').value.trim();
+  if(!title || !msg) return alert('Enter title and message');
+  const notifications = getNotifications();
+  notifications.unshift({id:'n_'+Date.now(), to: phone, title, msg, at: new Date().toISOString(), read:false});
+  saveNotifications(notifications);
+  alert('Notification sent to ' + phone);
+};
+
+// ---------------------------- Users (existing functionality) ----------------------------
+function renderUsers(){
+  const container = document.getElementById('userList');
+  let users = getUsers();
+  container.innerHTML = '';
+  users.forEach((u, idx) => {
+    const div = document.createElement('div');
+    div.className = 'p-3 border rounded flex justify-between items-start';
+    div.innerHTML = `
+      <div>
+        <div class="font-semibold">${u.name} <span class="text-xs text-gray-500">(${u.phone})</span></div>
+        <div class="text-sm text-gray-600">VIP: ${u.vip} | Balance: ₹${(u.balance||0).toFixed(2)} | Income: ₹${(u.totalIncome||0).toFixed(2)}</div>
+        <div class="text-xs text-gray-500 mt-1">Created: ${new Date(u.createdAt).toLocaleString()}</div>
+      </div>
+      <div class="flex flex-col gap-2">
+        <button class="giveBtn bg-green-500 text-white px-2 py-1 rounded" data-idx="${idx}">Give Points</button>
+        <button class="blockBtn bg-yellow-400 text-black px-2 py-1 rounded" data-idx="${idx}">${u.blocked? 'Unblock':'Block'}</button>
+        <button class="delBtn bg-red-500 text-white px-2 py-1 rounded" data-idx="${idx}">Delete</button>
+        <button class="viewBtn bg-gray-200 px-2 py-1 rounded" data-idx="${idx}">View / Edit</button>
+      </div>
+    `;
+    container.appendChild(div);
+  });
+
+  // attach listeners (re-using earlier patterns)
+  document.querySelectorAll('.giveBtn').forEach(b=>{
+    b.onclick = ()=>{
+      const i = Number(b.dataset.idx);
+      const amount = Number(prompt('Enter amount to add:', '100')) || 0;
+      if(amount<=0) return;
+      let users = getUsers();
+      users[i].balance = (users[i].balance||0) + amount;
+      saveUsers(users);
+      createTransaction({type:'admin_adjust', user: users[i].phone, amount, note:'Admin added balance'});
+      renderUsers();
+      renderTransactions();
+      alert('Added ₹'+amount);
+    };
+  });
+  document.querySelectorAll('.blockBtn').forEach(b=>{
+    b.onclick = ()=>{
+      const i = Number(b.dataset.idx);
+      let users = getUsers();
+      users[i].blocked = !users[i].blocked;
+      saveUsers(users); renderUsers();
+    };
+  });
+  document.querySelectorAll('.delBtn').forEach(b=>{
+    b.onclick = ()=>{
+      const i = Number(b.dataset.idx);
+      if(!confirm('Delete user?')) return;
+      let users = getUsers();
+      users.splice(i,1);
+      saveUsers(users); renderUsers();
+    };
+  });
+  document.querySelectorAll('.viewBtn').forEach(b=>{
+    b.onclick = ()=>{
+      const i = Number(b.dataset.idx);
+      let users = getUsers();
+      let u = users[i];
+      u.name = prompt('Name:', u.name) || u.name;
+      u.vip = prompt('VIP:', u.vip) || u.vip;
+      saveUsers(users); renderUsers();
+    };
+  });
+}
+renderUsers();
+
+// ---------------------------- Init load of dynamic parts ----------------------------
+renderQRList();
+renderDeposits();
+renderWithdraws();
+renderTransactions();
+
+</script>
+</body>
+</html>
