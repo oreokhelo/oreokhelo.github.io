@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Recharge</title>
+<script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="p-6 bg-gray-100 min-h-screen">
+
+<div class="max-w-md mx-auto">
+  <h1 class="text-2xl font-bold mb-4">Recharge</h1>
+
+  <!-- FIXED AMOUNT BUTTONS -->
+  <div class="bg-white p-4 rounded shadow mb-4">
+    <h2 class="font-semibold mb-3">Select Recharge Amount</h2>
+
+    <div class="grid grid-cols-2 gap-3">
+      <button class="amtBtn py-2 bg-yellow-500 text-white rounded" data-amt="350">₹350</button>
+      <button class="amtBtn py-2 bg-yellow-500 text-white rounded" data-amt="500">₹500</button>
+      <button class="amtBtn py-2 bg-yellow-500 text-white rounded" data-amt="1000">₹1000</button>
+      <button class="amtBtn py-2 bg-yellow-500 text-white rounded" data-amt="1500">₹1500</button>
+      <button class="amtBtn py-2 bg-yellow-500 text-white rounded" data-amt="2000">₹2000</button>
+      <button class="amtBtn py-2 bg-yellow-500 text-white rounded" data-amt="5000">₹5000</button>
+    </div>
+
+    <p class="text-xs mt-2 text-gray-600">*Amount select karne par uska QR code open hoga.</p>
+  </div>
+
+  <p class="text-sm mt-2"><a href="index.html" class="text-blue-600">Back</a></p>
+</div>
+
+<!-- POPUP FOR QR -->
+<div id="qrPopup" class="hidden fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center">
+  <div class="bg-white p-4 rounded shadow max-w-xs w-full text-center">
+    <h2 id="qrTitle" class="font-bold mb-2"></h2>
+    <img id="qrImg" src="" class="w-48 h-48 mx-auto mb-3 border p-1 rounded"/>
+    <button id="donePay" class="w-full py-2 bg-green-600 text-white rounded mb-2">I Have Paid</button>
+    <button onclick="closeQR()" class="w-full py-2 bg-gray-400 text-white rounded">Close</button>
+  </div>
+</div>
+
+<script>
+// DEFAULT QR STORAGE (admin panel se change ho jayenge)
+if (!localStorage.getItem("qrCodes")) {
+  localStorage.setItem("qrCodes", JSON.stringify({
+    350: "qr350.png",
+    500: "qr500.png",
+    1000: "qr1000.png",
+    1500: "qr1500.png",
+    2000: "qr2000.png",
+    5000: "qr5000.png"
+  }));
+}
+
+function getUsers(){ return JSON.parse(localStorage.getItem('users')||'[]'); }
+function saveUsers(u){ localStorage.setItem('users', JSON.stringify(u)); }
+
+// Handle Amount Button Click
+document.querySelectorAll(".amtBtn").forEach(btn=>{
+  btn.onclick = ()=>{
+    const amt = btn.dataset.amt;
+    openQR(amt);
+  }
+});
+
+function openQR(amount){
+  const qrData = JSON.parse(localStorage.getItem("qrCodes"));
+  document.getElementById("qrTitle").innerText = "Pay ₹" + amount;
+  document.getElementById("qrImg").src = qrData[amount] || "";
+
+  document.getElementById("donePay").onclick = function(){
+      completePayment(Number(amount));
+  };
+
+  document.getElementById("qrPopup").classList.remove("hidden");
+}
+
+function closeQR(){
+  document.getElementById("qrPopup").classList.add("hidden");
+}
+
+function completePayment(a){
+  const phone = localStorage.getItem('currentUser');
+  if(!phone){ alert('Login first'); location.href='login.html'; return; }
+
+  let users = getUsers();
+  const idx = users.findIndex(u=>u.phone===phone);
+
+  if(idx < 0){ alert("User not found"); return; }
+
+  users[idx].balance = (users[idx].balance||0) + a;
+
+  if(!users[idx].recharges) users[idx].recharges = [];
+  users[idx].recharges.push({
+      amount: a,
+      at: new Date().toISOString(),
+      method: "QR Payment"
+  });
+
+  saveUsers(users);
+
+  alert("₹" + a + " added successfully!");
+  location.href = "index.html";
+}
+</script>
+
+</body>
+</html>

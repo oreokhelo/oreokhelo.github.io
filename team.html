@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>Team</title>
+<script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="p-6 bg-gray-100">
+  <div class="max-w-md mx-auto">
+    <h1 class="text-2xl font-bold mb-4">My Team / Referrals</h1>
+    <div id="content" class="bg-white p-4 rounded shadow"></div>
+    <p class="mt-3"><a href="index.html" class="text-blue-600">Back</a></p>
+  </div>
+
+<script>
+function getUsers(){ return JSON.parse(localStorage.getItem('users')||'[]'); }
+const phone = localStorage.getItem('currentUser');
+if(!phone){ alert('Login first'); location.href='login.html'; }
+const all = getUsers();
+const me = all.find(u=>u.phone===phone);
+const cont = document.getElementById('content');
+cont.innerHTML = '<p class="text-gray-600">No referral system implemented in demo. Your account details:</p><pre class="mt-3 text-sm bg-gray-50 p-2 rounded">'+ JSON.stringify({phone:me.phone, name:me.name, balance:me.balance, vip:me.vip}, null, 2) +'</pre>';
+</script>
+</body>
+</html>

@@ -1,0 +1,42 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>Withdraw</title>
+<script src="https://cdn.tailwindcss.com"></script></head>
+<body class="p-6 bg-gray-100 min-h-screen">
+  <div class="max-w-md mx-auto">
+    <h1 class="text-2xl font-bold mb-4">Withdraw</h1>
+    <div class="bg-white p-4 rounded shadow">
+      <label class="font-semibold">Amount (₹)</label>
+      <input id="amt" type="number" class="w-full border p-2 rounded mt-1" placeholder="Enter amount" />
+      <label class="font-semibold mt-3">UPI / Account</label>
+      <input id="acc" class="w-full border p-2 rounded mt-1" placeholder="Enter UPI or account details" />
+      <button id="reqBtn" class="w-full bg-blue-600 text-white py-2 rounded mt-4">Request Withdraw</button>
+      <p class="text-sm mt-3">Withdraw requests will be processed by admin.</p>
+    </div>
+  </div>
+
+<script>
+function getWithdraws(){ return JSON.parse(localStorage.getItem('withdrawals')||'[]'); }
+function saveWithdraws(w){ localStorage.setItem('withdrawals', JSON.stringify(w)); }
+function getUsers(){ return JSON.parse(localStorage.getItem('users')||'[]'); }
+function saveUsers(u){ localStorage.setItem('users', JSON.stringify(u)); }
+
+document.getElementById('reqBtn').onclick = ()=>{
+  const amt = Number(document.getElementById('amt').value);
+  const acc = document.getElementById('acc').value.trim();
+  const phone = localStorage.getItem('currentUser');
+  if(!phone){ alert('Login first'); location.href='login.html'; return; }
+  if(!amt || amt <= 0 || !acc) return alert('Enter valid details');
+
+  const users = getUsers();
+  const uidx = users.findIndex(u=>u.phone===phone);
+  if(uidx < 0) return alert('User not found');
+  if((users[uidx].balance||0) < amt) return alert('Insufficient balance');
+
+  const withdraws = getWithdraws();
+  withdraws.push({ id:'w_'+Date.now(), userPhone: phone, amount: amt, to: acc, at: new Date().toISOString(), status:'requested' });
+  saveWithdraws(withdraws);
+
+  alert('Withdraw request submitted. Admin will process it.');
+  location.href = 'index.html';
+};
+</script>
+</body></html>

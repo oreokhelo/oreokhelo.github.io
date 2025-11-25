@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Signup</title>
+<script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen bg-gray-100 p-6">
+  <div class="max-w-md mx-auto">
+    <h1 class="text-2xl font-bold mb-4">Signup</h1>
+    <div class="bg-white p-4 rounded shadow">
+      <label class="block font-semibold">Phone (username)</label>
+      <input id="phone" class="w-full border p-2 rounded mt-1" placeholder="e.g. 911234567890" />
+      <label class="block font-semibold mt-3">Password</label>
+      <input id="password" type="password" class="w-full border p-2 rounded mt-1" />
+
+      <label class="block font-semibold mt-3">Display Name</label>
+      <input id="name" class="w-full border p-2 rounded mt-1" placeholder="Your name" />
+
+      <button id="signupBtn" class="mt-4 w-full bg-yellow-500 text-white py-2 rounded">Create account</button>
+      <p class="text-sm mt-3">Already have account? <a href="login.html" class="text-blue-600">Login</a></p>
+    </div>
+  </div>
+
+<script>
+// Helper: get users array
+function getUsers(){ return JSON.parse(localStorage.getItem('users')||'[]'); }
+function saveUsers(u){ localStorage.setItem('users', JSON.stringify(u)); }
+
+document.getElementById('signupBtn').onclick = () => {
+  const phone = document.getElementById('phone').value.trim();
+  const pwd = document.getElementById('password').value;
+  const name = document.getElementById('name').value.trim() || phone;
+  if(!phone || !pwd){ alert('Enter phone and password'); return; }
+  let users = getUsers();
+  if(users.find(x=>x.phone===phone)){ alert('User exists. Login instead.'); return; }
+
+  const user = {
+    phone, password: pwd, name,
+    balance: 0,
+    totalIncome: 0,
+    vip: 'VIP0',
+    blocked: false,
+    subscriptions: [], // {plan, price, daily, duration, startDate, earnedAlready}
+    createdAt: new Date().toISOString()
+  };
+  users.push(user);
+  saveUsers(users);
+  localStorage.setItem('currentUser', phone);
+  alert('Account created and logged in!');
+  location.href = 'index.html';
+};
+</script>
+</body>
+</html>

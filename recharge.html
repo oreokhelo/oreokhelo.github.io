@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>Recharge</title>
+<script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="p-6 bg-gray-100 min-h-screen">
+  <div class="max-w-md mx-auto">
+    <h1 class="text-2xl font-bold mb-4">Recharge</h1>
+
+    <div class="bg-white p-4 rounded shadow mb-4">
+      <h2 class="font-semibold mb-2">Select Amount</h2>
+      <div class="grid grid-cols-3 gap-2">
+        <button class="amtBtn bg-yellow-500 text-white py-2 rounded" data-amt="350">₹350</button>
+        <button class="amtBtn bg-yellow-500 text-white py-2 rounded" data-amt="500">₹500</button>
+        <button class="amtBtn bg-yellow-500 text-white py-2 rounded" data-amt="1000">₹1000</button>
+        <button class="amtBtn bg-yellow-500 text-white py-2 rounded" data-amt="1500">₹1500</button>
+        <button class="amtBtn bg-yellow-500 text-white py-2 rounded" data-amt="2000">₹2000</button>
+        <button class="amtBtn bg-yellow-500 text-white py-2 rounded" data-amt="5000">₹5000</button>
+      </div>
+      <p class="text-xs mt-2 text-gray-600">Choose amount -> scan QR -> after paying click "I Have Paid"</p>
+    </div>
+
+    <div class="bg-white p-4 rounded shadow text-center">
+      <h3 id="qrTitle" class="font-semibold mb-2">Scan QR to Pay</h3>
+      <img id="qrImg" class="mx-auto w-48 h-48 border rounded object-contain" src="">
+      <p id="selectedTxt" class="text-sm text-gray-600 mt-2"></p>
+      <div class="mt-3 grid grid-cols-2 gap-2">
+        <button id="paidBtn" class="bg-green-600 text-white py-2 rounded">I Have Paid</button>
+        <a href="index.html" class="bg-gray-200 text-gray-700 py-2 rounded text-center">Cancel</a>
+      </div>
+    </div>
+
+  </div>
+
+<script>
+function getDeposits(){ return JSON.parse(localStorage.getItem('deposits')||'[]'); }
+function saveDeposits(d){ localStorage.setItem('deposits', JSON.stringify(d)); }
+function getQRs(){ return JSON.parse(localStorage.getItem('qrCodes')||'{}'); }
+function getUsers(){ return JSON.parse(localStorage.getItem('users')||'[]'); }
+function saveUsers(u){ localStorage.setItem('users', JSON.stringify(u)); }
+
+let selectedAmount = null;
+const qrImg = document.getElementById('qrImg');
+const selTxt = document.getElementById('selectedTxt');
+const qrTitle = document.getElementById('qrTitle');
+
+function loadSelected(amount){
+  const qrs = getQRs();
+  selectedAmount = Number(amount);
+  qrImg.src = qrs[amount] || 'https://via.placeholder.com/300?text=No+QR';
+  selTxt.innerText = 'Selected ₹' + amount;
+  qrTitle.innerText = 'Scan QR for ₹' + amount;
+}
+
+document.querySelectorAll('.amtBtn').forEach(b=>{
+  b.onclick = ()=> loadSelected(b.dataset.amt);
+});
+
+// On paid -> create deposit request (pending)
+document.getElementById('paidBtn').onclick = ()=>{
+  if(!selectedAmount) return alert('Please select amount first');
+  const phone = localStorage.getItem('currentUser');
+  if(!phone){ alert('Login first'); location.href='login.html'; return; }
+  const deposits = getDeposits();
+  const deposit = {
+    id: 'dep_' + Date.now(),
+    userPhone: phone,
+    amount: selectedAmount,
+    at: new Date().toISOString(),
+    status: 'pending'
+  };
+  deposits.push(deposit);
+  saveDeposits(deposits);
+  alert('Deposit request submitted. Admin will verify and add balance after confirmation.');
+  location.href = 'index.html';
+};
+
+// init default QR preview
+(function(){
+  const qrs = getQRs();
+  const first = Object.keys(qrs)[0];
+  if(first) loadSelected(first);
+})();
+</script>
+</body>
+</html>

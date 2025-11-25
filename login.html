@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Login</title>
+<script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen bg-gray-100 p-6">
+  <div class="max-w-md mx-auto">
+    <h1 class="text-2xl font-bold mb-4">Login</h1>
+    <div class="bg-white p-4 rounded shadow">
+      <label class="block font-semibold">Phone</label>
+      <input id="phone" class="w-full border p-2 rounded mt-1" />
+      <label class="block font-semibold mt-3">Password</label>
+      <input id="password" type="password" class="w-full border p-2 rounded mt-1" />
+
+      <button id="loginBtn" class="mt-4 w-full bg-yellow-500 text-white py-2 rounded">Login</button>
+      <p class="text-sm mt-3">New? <a href="signup.html" class="text-blue-600">Signup</a></p>
+    </div>
+  </div>
+
+<script>
+function getUsers(){ return JSON.parse(localStorage.getItem('users')||'[]'); }
+function saveUsers(u){ localStorage.setItem('users', JSON.stringify(u)); }
+
+document.getElementById('loginBtn').onclick = () => {
+  const phone = document.getElementById('phone').value.trim();
+  const pwd = document.getElementById('password').value;
+  if(!phone || !pwd){ alert('Enter both'); return; }
+  const users = getUsers();
+  const user = users.find(x=>x.phone===phone && x.password===pwd);
+  if(!user){ alert('Invalid credentials'); return; }
+  if(user.blocked){ alert('Your account is blocked. Contact admin.'); return; }
+  // login
+  localStorage.setItem('currentUser', phone);
+
+  // on login: compute income since last check
+  computePendingIncomeForUser(user, users);
+
+  saveUsers(users);
+  location.href = 'index.html';
+};
+
+function computePendingIncomeForUser(user, allUsers){
+  const now = new Date();
+  user.subscriptions = user.subscriptions || [];
+  user.subscriptions.forEach(sub => {
+    const started = new Date(sub.startDate);
+    const daysPassed = Math.floor((now - started)/(1000*60*60*24));
+    const daysToCredit = Math.min(Math.max(daysPassed,0), sub.duration) - (sub.earnedAlreadyDays||0);
+    if(daysToCredit > 0){
+      const earning = daysToCredit * sub.daily;
+      user.balance = (user.balance||0) + earning;
+      user.totalIncome = (user.totalIncome||0) + earning;
+      sub.earnedAlreadyDays = (sub.earnedAlreadyDays||0) + daysToCredit;
+    }
+  });
+  // write back changed user inside allUsers
+  const idx = allUsers.findIndex(u=>u.phone===user.phone);
+  if(idx>=0) allUsers[idx] = user;
+}
+</script>
+</body>
+</html>
